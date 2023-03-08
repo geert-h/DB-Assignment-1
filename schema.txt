@@ -1,0 +1,95 @@
+CREATE TABLE IF NOT EXISTS "Account"
+(
+    [accountId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+    [username] NVARCHAR(255) NOT NULL,
+    [password] NVARCHAR(255) NOT NULL,
+    [birthDate] DATE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS "Save" 
+(
+	[saveId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+	[saveName] NVARCHAR(255),
+	[lastCheckpoint] NVARCHAR(255),
+	[accountId] INTEGER NOT NULL,
+	FOREIGN KEY ([accountId]) REFERENCES "Account" ([accountId])
+);
+
+CREATE TABLE IF NOT EXISTS "Character"
+(
+	[characterName] NVARCHAR(255) NOT NULL,
+	[maxHP] INTEGER,
+	[currentHP] INTEGER,
+	[level] INTEGER,
+	[currencyCount] INTEGER,
+	[strength] INTEGER,
+	[itemCount] INTEGER,
+	[maxWeight] INTEGER,
+	[currentWeight] INTEGER,
+	[equippedItem] INTEGER,
+	FOREIGN KEY ([equippedItem]) REFERENCES "Item" ([itemId]),
+	[saveId] INTEGER,
+	FOREIGN KEY ([saveId]) REFERENCES "Save" ([SaveId])
+);
+
+CREATE TABLE IF NOT EXISTS "Inventory"
+(
+	[itemId] INTEGER,
+	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId]),
+	[stackAmount] INTEGER, -- ADD CONSTRAINT
+	[saveId] INTEGER,
+	FOREIGN KEY ([saveId]) REFERENCES "Character" ([SaveId]) -- introduces redundancy
+);
+
+CREATE TABLE IF NOT EXISTS "Item" 
+(
+	[itemId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+	[itemName] NVARCHAR(255) NOT NULL,
+	[maxStackSize] INTEGER NOT NULL,
+	[itemType] NCHAR(1), -- ADD CONSTRAINT (can only be E,S or C)
+	[sellValue] INTEGER,
+	[buyValue] INTEGER,
+);
+
+CREATE TABLE IF NOT EXISTS "Equipable"
+(
+	[equipableType] NCHAR(1) NOT NULL,
+	[weight] INTEGER,
+	[itemId] INTEGER NOT NULL,
+	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId])
+);
+
+CREATE TABLE IF NOT EXISTS "Armor"
+(
+	[armorDefense] INTEGER NOT NULL,
+	[armorType] NVARCHAR(10) NOT NULL, -- Need to add constraint for the names
+	[itemId] INTEGER NOT NULL,
+	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId])
+);
+
+CREATE TABLE IF NOT EXISTS "Armor"
+(
+	[damage] INTEGER NOT NULL,
+	[weaponDefense] INTEGER NOT NULL,
+	[weaponType] INTEGER NOT NULL,
+	[weaponRange] INTEGER NOT NULL,
+	[itemId] INTEGER NOT NULL,
+	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId])
+);
+
+CREATE TABLE IF NOT EXISTS "Stackable"
+(
+	[itemId] INTEGER NOT NULL,
+	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId])
+);
+
+CREATE TABLE IF NOT EXISTS "Consumable"
+(
+	[useCount] INTEGER NOT NULL,
+	[usedCount] INTEGER NOT NULL,
+	[buffType] NCHAR(3),
+	[buffAmount] INTEGER NOT NULL,
+	[buffDuration] INTEGER NOT NULL,
+	[itemId] INTEGER NOT NULL,
+	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId])
+);
