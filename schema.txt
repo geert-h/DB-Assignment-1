@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS "Armor"
 	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId])
 );
 
-CREATE TABLE IF NOT EXISTS "Armor"
+CREATE TABLE IF NOT EXISTS "Handheld"
 (
 	[damage] INTEGER NOT NULL,
 	[weaponDefense] INTEGER NOT NULL,
@@ -92,4 +92,49 @@ CREATE TABLE IF NOT EXISTS "Consumable"
 	[buffDuration] INTEGER NOT NULL,
 	[itemId] INTEGER NOT NULL,
 	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId])
+);
+
+CREATE TABLE IF NOT EXISTS "Entity"
+(
+	[entityId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+	[entityName] NVARCHAR(255) NOT NULL,
+	[maxHP] INTEGER NOT NULL,
+	[currentHP] INTEGER NOT NULL,
+	[droppedCurrency] INTEGER NOT NULL,
+	[Strength] INTEGER NOT NULL,
+	[droppedXP] INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS "NPC"
+(
+	[multiplier] REAL NOT NULL,
+	[entityId] INTEGER NOT NULL,
+	FOREIGN KEY ([entityId]) REFERENCES "Entity" ([entityId])
+);
+
+CREATE TABLE IF NOT EXISTS "Shop"
+(
+	[itemId] INTEGER NOT NULL,
+	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId]),
+	[stackAmount] INTEGER, -- ADD CONSTRAINT
+	[entityId] INTEGER NOT NULL,
+	FOREIGN KEY ([entityId]) REFERENCES "NPC" ([entityId]) -- introduces redundancy
+);
+
+CREATE TABLE IF NOT EXISTS "Boss"
+(
+	[entityId] INTEGER,
+	FOREIGN KEY ([entityId]) REFERENCES "Entity" ([entityId])
+);
+
+CREATE TABLE IF NOT EXISTS "Enemy"
+(
+	[entityId] INTEGER,
+	FOREIGN KEY ([entityId]) REFERENCES "Entity" ([entityId])
+);
+
+CREATE TABLE IF NOT EXISTS "Passive"
+(
+	[entityId] INTEGER,
+	FOREIGN KEY ([entityId]) REFERENCES "Entity" ([entityId])
 );
