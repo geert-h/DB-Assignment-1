@@ -2,43 +2,44 @@ CREATE TABLE IF NOT EXISTS "Account"
 (
     [accountId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     [username] NVARCHAR(255) NOT NULL,
-    [password] NVARCHAR(255) NOT NULL,
+    [hashedPassword] NVARCHAR(255) NOT NULL,
     [birthDate] DATE NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS "Save" 
 (
 	[saveId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-	[saveName] NVARCHAR(255),
-	[lastCheckpoint] NVARCHAR(255),
+	[saveName] NVARCHAR(255) NOT NULL,
+	[minutesPlayed] INTEGER NOT NULL,
 	[accountId] INTEGER NOT NULL,
-	FOREIGN KEY ([accountId]) REFERENCES "Account" ([accountId])
+	FOREIGN KEY ([accountId]) REFERENCES "Account" ([accountId]) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS "Character"
 (
 	[characterName] NVARCHAR(255) NOT NULL,
-	[maxHP] INTEGER,
-	[currentHP] INTEGER,
-	[level] INTEGER,
-	[currencyCount] INTEGER,
-	[strength] INTEGER,
-	[itemCount] INTEGER,
-	[maxWeight] INTEGER,
-	[currentWeight] INTEGER,
-	[equippedItem] INTEGER,
+	[maxHP] INTEGER NOT NULL,
+	[currentHP] INTEGER NOT NULL,
+	[level] INTEGER NOT NULL,
+	[currencyCount] INTEGER NOT NULL,
+	[strength] INTEGER NOT NULL,
+	[itemCount] INTEGER NOT NULL,
+	[maxWeight] INTEGER NOT NULL,
+	[currentWeight] INTEGER NOT NULL,
+	[equippedItem] INTEGER NOT NULL,
 	FOREIGN KEY ([equippedItem]) REFERENCES "Item" ([itemId]),
-	[saveId] INTEGER,
-	FOREIGN KEY ([saveId]) REFERENCES "Save" ([SaveId])
+	[characterId] INTEGER NOT NULL,
+	FOREIGN KEY ([characterId]) REFERENCES "Save" ([SaveId]) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS "Inventory"
 (
-	[itemId] INTEGER,
-	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId]),
-	[stackAmount] INTEGER, -- ADD CONSTRAINT
-	[saveId] INTEGER,
-	FOREIGN KEY ([saveId]) REFERENCES "Character" ([SaveId]) -- introduces redundancy
+	[item] INTEGER NOT NULL,
+	FOREIGN KEY ([item]) REFERENCES "Item" ([itemId]),
+	[stackAmount] INTEGER NOT NULL,
+	[inventoryId] INTEGER NOT NULL,
+	FOREIGN KEY ([inventoryId]) REFERENCES "Character" ([characterId]) ON DELETE CASCADE
+	CONSTRAINT 'maxStackAmount' CHECK(stackAmount <= SELECT maxStackSize FROM "Item" WHERE Item.itemId = Inventory.item)
 );
 
 CREATE TABLE IF NOT EXISTS "Item" 
@@ -46,35 +47,34 @@ CREATE TABLE IF NOT EXISTS "Item"
 	[itemId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
 	[itemName] NVARCHAR(255) NOT NULL,
 	[maxStackSize] INTEGER NOT NULL,
-	[itemType] NCHAR(1), -- ADD CONSTRAINT (can only be E,S or C)
-	[sellValue] INTEGER,
-	[buyValue] INTEGER,
+	[sellValue] INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS "Equipable"
 (
-	[equipableType] NCHAR(1) NOT NULL,
-	[weight] INTEGER,
+	[weight] INTEGER NOT NULL,
 	[itemId] INTEGER NOT NULL,
 	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId])
 );
 
 CREATE TABLE IF NOT EXISTS "Armor"
 (
-	[armorDefense] INTEGER NOT NULL,
-	[armorType] NVARCHAR(10) NOT NULL, -- Need to add constraint for the names
+	[defense] INTEGER NOT NULL,
+	[armorType] NVARCHAR(10) NOT NULL,
 	[itemId] INTEGER NOT NULL,
-	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId])
+	FOREIGN KEY ([itemId]) REFERENCES "Equipable" ([itemId]),
+	CONSTRAINT 'armorSlot' CHECK(armorType IN ('Head', 'Torso', 'legs', 'Feet'))
 );
 
 CREATE TABLE IF NOT EXISTS "Handheld"
 (
 	[damage] INTEGER NOT NULL,
-	[weaponDefense] INTEGER NOT NULL,
+	[block] INTEGER NOT NULL,
 	[weaponType] INTEGER NOT NULL,
 	[weaponRange] INTEGER NOT NULL,
 	[itemId] INTEGER NOT NULL,
-	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId])
+	FOREIGN KEY ([itemId]) REFERENCES "Equipable" ([itemId]),
+	CONSTRAINT 'weaponSlot' CHECK(weaponType IN ('melee', 'ranged', 'shield'))
 );
 
 CREATE TABLE IF NOT EXISTS "Stackable"
@@ -87,17 +87,18 @@ CREATE TABLE IF NOT EXISTS "Consumable"
 (
 	[useCount] INTEGER NOT NULL,
 	[usedCount] INTEGER NOT NULL,
-	[buffType] NCHAR(3),
+	[buffType] NCHAR(10) NOT NULL,
 	[buffAmount] INTEGER NOT NULL,
-	[buffDuration] INTEGER NOT NULL,
+	[buffDuration] INTEGER, -- If NULL the buff is permanent
 	[itemId] INTEGER NOT NULL,
-	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId])
+	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId]),
+	CONSTRAINT 'buffName' CHECK(buffType IN ('HP', 'maxHP', 'Strength', 'maxWeight', 'defense'))
 );
 
-CREATE TABLE IF NOT EXISTS "Entity"
+CREATE TABLE IF NOT EXISTS "NPC"
 (
-	[entityId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-	[entityName] NVARCHAR(255) NOT NULL,
+	[NPCId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+	[NPCName] NVARCHAR(255) NOT NULL,
 	[maxHP] INTEGER NOT NULL,
 	[currentHP] INTEGER NOT NULL,
 	[droppedCurrency] INTEGER NOT NULL,
@@ -105,36 +106,57 @@ CREATE TABLE IF NOT EXISTS "Entity"
 	[droppedXP] INTEGER NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS "NPC"
+CREATE TABLE IF NOT EXISTS "NPCItems"
 (
-	[multiplier] REAL NOT NULL,
-	[entityId] INTEGER NOT NULL,
-	FOREIGN KEY ([entityId]) REFERENCES "Entity" ([entityId])
+	[item] INTEGER NOT NULL,
+	FOREIGN KEY ([item]) REFERENCES "Item" ([itemId]),
+	[NPCId] INTEGER NOT NULL,
+	FOREIGN KEY ([NPCId]) REFERENCES "NPC" ([NPCId]),
+	[isEquipped] BIT NOT NULL,
+	[dropChance] INTEGER NOT NULL CHECK(dropChance <= 100),
+	[stackAmount] INTEGER NOT NULL,
+	CONSTRAINT 'maxStackAmount' CHECK(stackAmount <= SELECT maxStackSize FROM "Item" WHERE Item.itemId = NPCItems.item)
+);
+
+CREATE TABLE IF NOT EXISTS "RemainingNPCs"
+(
+	[NPCId] INTEGER NOT NULL,
+	FOREIGN KEY ([NPCId]) REFERENCES "NPC" ([NPCId])
+	CONSTRAINT 'InBossOrDialogueNPC' CHECK(NPCId IN (SELECT NPCId FROM "DialogueNPC" UNION SELECT NPCId FROM "Boss"))
+);
+
+CREATE TABLE IF NOT EXISTS "DialogueNPC"
+(
+	[NPCId] INTEGER NOT NULL,
+	FOREIGN KEY ([NPCId]) REFERENCES "NPC" ([NPCId])
 );
 
 CREATE TABLE IF NOT EXISTS "Shop"
 (
 	[itemId] INTEGER NOT NULL,
 	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId]),
-	[stackAmount] INTEGER, -- ADD CONSTRAINT
-	[entityId] INTEGER NOT NULL,
-	FOREIGN KEY ([entityId]) REFERENCES "NPC" ([entityId]) -- introduces redundancy
+	[itemPrice] INTEGER NOT NULL,
+	[stackAmount] INTEGER NOT NULL,
+	[NPCId] INTEGER NOT NULL,
+	FOREIGN KEY ([NPCId]) REFERENCES "NPC" ([NPCId]) ON DELETE CASCADE
+	CONSTRAINT 'maxStackAmount' CHECK(stackAmount <= SELECT maxStackSize FROM "Item" WHERE Item.itemId = Shop.item)
 );
 
 CREATE TABLE IF NOT EXISTS "Boss"
 (
-	[entityId] INTEGER,
-	FOREIGN KEY ([entityId]) REFERENCES "Entity" ([entityId])
+	[NPCId] INTEGER NOT NULL,
+	FOREIGN KEY ([NPCId]) REFERENCES "NPC" ([NPCId])
 );
 
 CREATE TABLE IF NOT EXISTS "Enemy"
 (
-	[entityId] INTEGER,
-	FOREIGN KEY ([entityId]) REFERENCES "Entity" ([entityId])
+	[NPCId] INTEGER NOT NULL,
+	FOREIGN KEY ([NPCId]) REFERENCES "NPC" ([NPCId])
 );
 
 CREATE TABLE IF NOT EXISTS "Passive"
 (
-	[entityId] INTEGER,
-	FOREIGN KEY ([entityId]) REFERENCES "Entity" ([entityId])
+	[isScared] BIT NOT NULL,
+	[NPCId] INTEGER NOT NULL,
+	FOREIGN KEY ([NPCId]) REFERENCES "NPC" ([NPCId])
 );
