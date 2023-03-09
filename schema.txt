@@ -27,20 +27,28 @@ CREATE TABLE IF NOT EXISTS "Character"
 	[maxWeight] INTEGER NOT NULL,
 	[currentWeight] INTEGER NOT NULL,
 	[equippedItem] INTEGER NOT NULL,
-	FOREIGN KEY ([equippedItem]) REFERENCES "Item" ([itemId]),
 	[characterId] INTEGER NOT NULL,
+	FOREIGN KEY ([equippedItem]) REFERENCES "Item" ([itemId]),
 	FOREIGN KEY ([characterId]) REFERENCES "Save" ([SaveId]) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS "Inventory"
 (
-	[item] INTEGER NOT NULL,
-	FOREIGN KEY ([item]) REFERENCES "Item" ([itemId]),
+	[itemId] INTEGER NOT NULL,
 	[stackAmount] INTEGER NOT NULL,
 	[inventoryId] INTEGER NOT NULL,
+	CONSTRAINT 'maxStackAmount',
+	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId])
 	FOREIGN KEY ([inventoryId]) REFERENCES "Character" ([characterId]) ON DELETE CASCADE
-	CONSTRAINT 'maxStackAmount' CHECK(stackAmount <= SELECT maxStackSize FROM "Item" WHERE Item.itemId = Inventory.item)
 );
+
+CREATE TRIGGER IF NOT EXISTS maxStackAmountTriggerInventory
+BEFORE INSERT ON Inventory
+FOR EACH ROW
+WHEN NEW.stackAmount > (SELECT maxStackSize FROM Item WHERE Item.itemId = NEW.itemId)
+BEGIN
+    SELECT RAISE(ABORT, 'stackAmount exceeds maxStackSize for this item');
+END;
 
 CREATE TABLE IF NOT EXISTS "Item" 
 (
@@ -62,8 +70,8 @@ CREATE TABLE IF NOT EXISTS "Armor"
 	[defense] INTEGER NOT NULL,
 	[armorType] NVARCHAR(10) NOT NULL,
 	[itemId] INTEGER NOT NULL,
-	FOREIGN KEY ([itemId]) REFERENCES "Equipable" ([itemId]),
-	CONSTRAINT 'armorSlot' CHECK(armorType IN ('Head', 'Torso', 'legs', 'Feet'))
+	CONSTRAINT 'armorSlot' CHECK(armorType IN ('Head', 'Torso', 'legs', 'Feet')),
+	FOREIGN KEY ([itemId]) REFERENCES "Equipable" ([itemId])
 );
 
 CREATE TABLE IF NOT EXISTS "Handheld"
@@ -73,8 +81,8 @@ CREATE TABLE IF NOT EXISTS "Handheld"
 	[weaponType] INTEGER NOT NULL,
 	[weaponRange] INTEGER NOT NULL,
 	[itemId] INTEGER NOT NULL,
-	FOREIGN KEY ([itemId]) REFERENCES "Equipable" ([itemId]),
-	CONSTRAINT 'weaponSlot' CHECK(weaponType IN ('melee', 'ranged', 'shield'))
+	CONSTRAINT 'weaponSlot' CHECK(weaponType IN ('melee', 'ranged', 'shield')),
+	FOREIGN KEY ([itemId]) REFERENCES "Equipable" ([itemId])
 );
 
 CREATE TABLE IF NOT EXISTS "Stackable"
@@ -91,8 +99,8 @@ CREATE TABLE IF NOT EXISTS "Consumable"
 	[buffAmount] INTEGER NOT NULL,
 	[buffDuration] INTEGER, -- If NULL the buff is permanent
 	[itemId] INTEGER NOT NULL,
-	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId]),
 	CONSTRAINT 'buffName' CHECK(buffType IN ('HP', 'maxHP', 'Strength', 'maxWeight', 'defense'))
+	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId])
 );
 
 CREATE TABLE IF NOT EXISTS "NPC"
@@ -108,22 +116,38 @@ CREATE TABLE IF NOT EXISTS "NPC"
 
 CREATE TABLE IF NOT EXISTS "NPCItems"
 (
-	[item] INTEGER NOT NULL,
-	FOREIGN KEY ([item]) REFERENCES "Item" ([itemId]),
+	[itemId] INTEGER NOT NULL,
 	[NPCId] INTEGER NOT NULL,
-	FOREIGN KEY ([NPCId]) REFERENCES "NPC" ([NPCId]),
 	[isEquipped] BIT NOT NULL,
 	[dropChance] INTEGER NOT NULL CHECK(dropChance <= 100),
 	[stackAmount] INTEGER NOT NULL,
-	CONSTRAINT 'maxStackAmount' CHECK(stackAmount <= SELECT maxStackSize FROM "Item" WHERE Item.itemId = NPCItems.item)
+	CONSTRAINT 'maxStackAmount',
+	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId]),
+	FOREIGN KEY ([NPCId]) REFERENCES "NPC" ([NPCId])
 );
+
+CREATE TRIGGER IF NOT EXISTS maxStackAmountTriggerNPCItems
+BEFORE INSERT ON NPCItems
+FOR EACH ROW
+WHEN NEW.stackAmount > (SELECT maxStackSize FROM Item WHERE Item.itemId = NEW.itemId)
+BEGIN
+    SELECT RAISE(ABORT, 'stackAmount exceeds maxStackSize for this item');
+END;
 
 CREATE TABLE IF NOT EXISTS "RemainingNPCs"
 (
 	[NPCId] INTEGER NOT NULL,
+	CONSTRAINT 'InBossOrDialogueNPC'
 	FOREIGN KEY ([NPCId]) REFERENCES "NPC" ([NPCId])
-	CONSTRAINT 'InBossOrDialogueNPC' CHECK(NPCId IN (SELECT NPCId FROM "DialogueNPC" UNION SELECT NPCId FROM "Boss"))
 );
+
+CREATE TRIGGER IF NOT EXISTS InBossOrDialogueNPCTrigger
+BEFORE INSERT ON RemainingNPCs
+FOR EACH ROW
+WHEN NEW.NPCId NOT IN (SELECT NPCId FROM DialogueNPC UNION SELECT NPCId FROM Boss)
+BEGIN
+    SELECT RAISE(ABORT, 'This NPC is not a  Boss or a DialogueNPC');
+END;
 
 CREATE TABLE IF NOT EXISTS "DialogueNPC"
 (
@@ -134,13 +158,21 @@ CREATE TABLE IF NOT EXISTS "DialogueNPC"
 CREATE TABLE IF NOT EXISTS "Shop"
 (
 	[itemId] INTEGER NOT NULL,
-	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId]),
 	[itemPrice] INTEGER NOT NULL,
 	[stackAmount] INTEGER NOT NULL,
 	[NPCId] INTEGER NOT NULL,
+	CONSTRAINT 'maxStackAmount',
+	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId]),
 	FOREIGN KEY ([NPCId]) REFERENCES "NPC" ([NPCId]) ON DELETE CASCADE
-	CONSTRAINT 'maxStackAmount' CHECK(stackAmount <= SELECT maxStackSize FROM "Item" WHERE Item.itemId = Shop.item)
 );
+
+CREATE TRIGGER IF NOT EXISTS maxStackAmountTriggerShop
+BEFORE INSERT ON Shop
+FOR EACH ROW
+WHEN NEW.stackAmount > (SELECT maxStackSize FROM Item WHERE Item.itemId = NEW.itemId)
+BEGIN
+    SELECT RAISE(ABORT, 'stackAmount exceeds maxStackSize for this item');
+END;
 
 CREATE TABLE IF NOT EXISTS "Boss"
 (
