@@ -1,0 +1,195 @@
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE IF NOT EXISTS "Account"
+(
+    [accountId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+    [username] NVARCHAR(255) NOT NULL,
+    [hashedPassword] NVARCHAR(255) NOT NULL,
+    [birthDate] DATE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS "Save" 
+(
+	[saveId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+	[accountId] INTEGER NOT NULL,
+	[saveName] NVARCHAR(255) NOT NULL,
+	[minutesPlayed] INTEGER NOT NULL,
+	FOREIGN KEY ([accountId]) REFERENCES "Account" ([accountId]) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "Character"
+(
+	[characterId] INTEGER PRIMARY KEY NOT NULL,
+	[characterName] NVARCHAR(255) NOT NULL,
+	[maxHP] INTEGER NOT NULL,
+	[currentHP] INTEGER NOT NULL,
+	[level] INTEGER NOT NULL,
+	[currencyCount] INTEGER NOT NULL,
+	[strength] INTEGER NOT NULL,
+	[itemCount] INTEGER NOT NULL,
+	[maxWeight] INTEGER NOT NULL,
+	[currentWeight] INTEGER NOT NULL,
+	[equippedItem] INTEGER,
+	FOREIGN KEY ([equippedItem]) REFERENCES "Item" ([itemId]),
+	FOREIGN KEY ([characterId]) REFERENCES "Save" ([SaveId]) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "Item" 
+(
+	[itemId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+	[itemName] NVARCHAR(255) NOT NULL,
+	[dropChance] INTEGER NOT NULL CHECK(dropChance <= 100),
+	[price] INTEGER,
+	[maxStackSize] INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS "Equipable"
+(
+	[itemId] INTEGER PRIMARY KEY NOT NULL UNIQUE,
+	[weight] INTEGER NOT NULL,
+	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId])
+);
+
+CREATE TABLE IF NOT EXISTS "Armor"
+(
+	[itemId] INTEGER NOT NULL UNIQUE,
+	[defense] INTEGER NOT NULL,
+	[armorType] NVARCHAR(10) NOT NULL,
+	CONSTRAINT 'armorSlot' CHECK(armorType IN ('Head', 'Torso', 'legs', 'Feet')),
+	FOREIGN KEY ([itemId]) REFERENCES "Equipable" ([itemId])
+);
+
+CREATE TABLE IF NOT EXISTS "Handheld"
+(
+	[itemId] INTEGER NOT NULL UNIQUE,
+	[damage] INTEGER NOT NULL,
+	[block] INTEGER NOT NULL,
+	[weaponType] INTEGER NOT NULL,
+	[weaponRange] INTEGER NOT NULL,
+	CONSTRAINT 'weaponSlot' CHECK(weaponType IN ('melee', 'ranged', 'shield')),
+	FOREIGN KEY ([itemId]) REFERENCES "Equipable" ([itemId])
+);
+
+CREATE TABLE IF NOT EXISTS "Stackable"
+(
+	[itemId] INTEGER NOT NULL UNIQUE,
+	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId])
+);
+
+CREATE TABLE IF NOT EXISTS "Consumable"
+(
+	[itemId] INTEGER NOT NULL UNIQUE,
+	[useCount] INTEGER NOT NULL,
+	[usedCount] INTEGER NOT NULL,
+	[buffType] NCHAR(10) NOT NULL CHECK(buffType IN ('HP', 'maxHP', 'Strength', 'maxWeight', 'defense')),
+	[buffAmount] INTEGER NOT NULL,
+	[buffDuration] INTEGER, -- If NULL the buff is permanent
+	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId])
+);
+
+CREATE TABLE IF NOT EXISTS "NPC"
+(
+	[NPCId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+	[NPCName] NVARCHAR(255) NOT NULL,
+	[maxHP] INTEGER NOT NULL,
+	[currentHP] INTEGER NOT NULL,
+	[droppedCurrency] INTEGER NOT NULL,
+	[equippedItem] INTEGER,
+	[Strength] INTEGER NOT NULL,
+	[droppedXP] INTEGER NOT NULL,
+	FOREIGN KEY ([equippedItem]) REFERENCES "Item" ([itemId])
+);
+
+CREATE TABLE IF NOT EXISTS "HasItems"
+(
+	[containerId] INTEGER NOT NULL,
+	[itemId] INTEGER NOT NULL,
+	[stackAmount] INTEGER NOT NULL,
+	FOREIGN KEY ([containerId]) REFERENCES "ItemContainer" ([containerId]) ON DELETE CASCADE,
+	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId])
+);
+
+CREATE TABLE IF NOT EXISTS "ItemContainer"
+(
+	[containerId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS "Inventory"
+(
+	[containerId] INTEGER NOT NULL UNIQUE,
+	[inventoryId] INTEGER NOT NULL UNIQUE,
+	FOREIGN KEY ([containerId]) REFERENCES "ItemContainer" ([containerId]) ON DELETE CASCADE,
+	FOREIGN KEY ([inventoryId]) REFERENCES "Character" ([characterId]) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "NPCItems"
+(
+	[containerId] INTEGER NOT NULL UNIQUE,
+	[NPCId] INTEGER NOT NULL UNIQUE,
+	FOREIGN KEY ([containerId]) REFERENCES "ItemContainer" ([containerId]) ON DELETE CASCADE,
+	FOREIGN KEY ([NPCId]) REFERENCES "NPC" ([NPCId])
+);
+
+CREATE TABLE IF NOT EXISTS "Shop"
+(
+	[containerId] INTEGER NOT NULL,
+	[DNPCId] INTEGER NOT NULL,
+	FOREIGN KEY ([containerId]) REFERENCES "ItemContainer" ([containerId]) ON DELETE CASCADE,
+	FOREIGN KEY ([DNPCId]) REFERENCES "DialogueNPC" ([NPCId]) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "RemainingNPCs"
+(
+	[saveId] INTEGER NOT NULL UNIQUE,
+	[RemainingNPCsId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL UNIQUE,
+	FOREIGN KEY ([saveId]) REFERENCES "Save" ([saveId])
+);
+
+CREATE TABLE IF NOT EXISTS "Remaining"
+(
+	[RemainingNPCsId] INTEGER NOT NULL,
+	[NPCId] INTEGER NOT NULL,
+	FOREIGN KEY ([NPCId]) REFERENCES "NPC" ([NPCId])
+	FOREIGN KEY ([RemainingNPCsId]) REFERENCES "RemainingNPCs" ([RemainingNPCsId])
+);
+
+CREATE TABLE IF NOT EXISTS "DialogueNPC"
+(
+	[NPCId] INTEGER PRIMARY KEY NOT NULL UNIQUE,
+	FOREIGN KEY ([NPCId]) REFERENCES "NPC" ([NPCId])
+);
+
+CREATE TABLE IF NOT EXISTS "Boss"
+(
+	[NPCId] INTEGER NOT NULL UNIQUE,
+	FOREIGN KEY ([NPCId]) REFERENCES "NPC" ([NPCId])
+);
+
+CREATE TABLE IF NOT EXISTS "Enemy"
+(
+	[NPCId] INTEGER NOT NULL UNIQUE,
+	FOREIGN KEY ([NPCId]) REFERENCES "NPC" ([NPCId])	
+);
+
+CREATE TABLE IF NOT EXISTS "Passive"
+(
+	[isScared] BIT NOT NULL,
+	[NPCId] INTEGER NOT NULL UNIQUE,
+	FOREIGN KEY ([NPCId]) REFERENCES "NPC" ([NPCId])
+);
+
+CREATE TRIGGER IF NOT EXISTS InBossOrDialogueNPCTrigger
+BEFORE INSERT ON Remaining
+FOR EACH ROW
+WHEN NEW.NPCId NOT IN (SELECT NPCId FROM DialogueNPC UNION SELECT NPCId FROM Boss)
+BEGIN
+    SELECT RAISE(ABORT, 'This NPC is not a Boss or a DialogueNPC');
+END;
+
+CREATE TRIGGER IF NOT EXISTS maxStackAmountTrigger
+BEFORE INSERT ON HasItems
+FOR EACH ROW
+WHEN NEW.stackAmount > (SELECT maxStackSize FROM Item WHERE Item.itemId = NEW.itemId)
+BEGIN
+    SELECT RAISE(ABORT, 'stackAmount exceeds maxStackSize for this item');
+END;

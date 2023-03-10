@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS "Character"
 	[maxWeight] INTEGER NOT NULL,
 	[currentWeight] INTEGER NOT NULL,
 	[equippedItem] INTEGER NOT NULL,
-	[characterId] INTEGER NOT NULL,
+	[characterId] INTEGER PRIMARY KEY NOT NULL,
 	FOREIGN KEY ([equippedItem]) REFERENCES "Item" ([itemId]),
 	FOREIGN KEY ([characterId]) REFERENCES "Save" ([SaveId]) ON DELETE CASCADE
 );
@@ -37,7 +37,6 @@ CREATE TABLE IF NOT EXISTS "Inventory"
 	[itemId] INTEGER NOT NULL,
 	[stackAmount] INTEGER NOT NULL,
 	[inventoryId] INTEGER NOT NULL,
-	CONSTRAINT 'maxStackAmount',
 	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId])
 	FOREIGN KEY ([inventoryId]) REFERENCES "Character" ([characterId]) ON DELETE CASCADE
 );
@@ -61,7 +60,7 @@ CREATE TABLE IF NOT EXISTS "Item"
 CREATE TABLE IF NOT EXISTS "Equipable"
 (
 	[weight] INTEGER NOT NULL,
-	[itemId] INTEGER NOT NULL,
+	[itemId] INTEGER PRIMARY KEY NOT NULL,
 	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId])
 );
 
@@ -95,11 +94,10 @@ CREATE TABLE IF NOT EXISTS "Consumable"
 (
 	[useCount] INTEGER NOT NULL,
 	[usedCount] INTEGER NOT NULL,
-	[buffType] NCHAR(10) NOT NULL,
+	[buffType] NCHAR(10) NOT NULL CHECK(buffType IN ('HP', 'maxHP', 'Strength', 'maxWeight', 'defense')),
 	[buffAmount] INTEGER NOT NULL,
 	[buffDuration] INTEGER, -- If NULL the buff is permanent
 	[itemId] INTEGER NOT NULL,
-	CONSTRAINT 'buffName' CHECK(buffType IN ('HP', 'maxHP', 'Strength', 'maxWeight', 'defense'))
 	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId])
 );
 
@@ -121,7 +119,6 @@ CREATE TABLE IF NOT EXISTS "NPCItems"
 	[isEquipped] BIT NOT NULL,
 	[dropChance] INTEGER NOT NULL CHECK(dropChance <= 100),
 	[stackAmount] INTEGER NOT NULL,
-	CONSTRAINT 'maxStackAmount',
 	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId]),
 	FOREIGN KEY ([NPCId]) REFERENCES "NPC" ([NPCId])
 );
@@ -137,8 +134,9 @@ END;
 CREATE TABLE IF NOT EXISTS "RemainingNPCs"
 (
 	[NPCId] INTEGER NOT NULL,
-	CONSTRAINT 'InBossOrDialogueNPC'
+	[saveId] INTEGER NOT NULL,
 	FOREIGN KEY ([NPCId]) REFERENCES "NPC" ([NPCId])
+	FOREIGN KEY ([saveId]) REFERENCES "Save" ([saveId])
 );
 
 CREATE TRIGGER IF NOT EXISTS InBossOrDialogueNPCTrigger
@@ -146,12 +144,12 @@ BEFORE INSERT ON RemainingNPCs
 FOR EACH ROW
 WHEN NEW.NPCId NOT IN (SELECT NPCId FROM DialogueNPC UNION SELECT NPCId FROM Boss)
 BEGIN
-    SELECT RAISE(ABORT, 'This NPC is not a  Boss or a DialogueNPC');
+    SELECT RAISE(ABORT, 'This NPC is not a Boss or a DialogueNPC');
 END;
 
 CREATE TABLE IF NOT EXISTS "DialogueNPC"
 (
-	[NPCId] INTEGER NOT NULL,
+	[NPCId] INTEGER PRIMARY KEY NOT NULL,
 	FOREIGN KEY ([NPCId]) REFERENCES "NPC" ([NPCId])
 );
 
@@ -161,9 +159,8 @@ CREATE TABLE IF NOT EXISTS "Shop"
 	[itemPrice] INTEGER NOT NULL,
 	[stackAmount] INTEGER NOT NULL,
 	[NPCId] INTEGER NOT NULL,
-	CONSTRAINT 'maxStackAmount',
 	FOREIGN KEY ([itemId]) REFERENCES "Item" ([itemId]),
-	FOREIGN KEY ([NPCId]) REFERENCES "NPC" ([NPCId]) ON DELETE CASCADE
+	FOREIGN KEY ([NPCId]) REFERENCES "DialogueNPC" ([NPCId]) ON DELETE CASCADE
 );
 
 CREATE TRIGGER IF NOT EXISTS maxStackAmountTriggerShop

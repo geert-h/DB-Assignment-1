@@ -1,0 +1,24 @@
+INSERT INTO Account(username, hashedPassword, birthDate)
+VALUES ('Geert','1234huts','2004-01-16'),('Geerten','1234boem','2005-01-16'),('Aiden','1234huts','2000-01-16');
+
+INSERT INTO Save(saveName, minutesPlayed, accountId)
+VALUES ('TEST','0','1'),('TEST2','0','2'),('TEST3','0','3'),('TEST4','0','3');
+
+
+INSERT INTO Character(characterName, maxHP, currentHP, level, currencyCount, strength, itemCount, maxWeight, currentWeight, characterId)
+VALUES ('IKZELF','100','99', '4','200','3','2','6','4','1'),('JIJZELF','100','99', '4','200','3','2','6','4','2');
+
+INSERT INTO NPC ('NPCName', 'maxHP', 'currentHP', 'droppedCurrency', 'Strength', 'droppedXP')
+VALUES('Goblin', '100', '100', '20', '14', '6'),('large goblin', '100', '100', '20', '14', '6'),('horse', '100', '100', '20', '14', '6'),('endBoss', '100', '100', '20', '14', '6');
+
+INSERT INTO Passive(NPCId, IsScared)
+VALUES ('3', '1');
+
+INSERT INTO Boss(NPCId)
+VALUES ('4'),('4');
+
+INSERT INTO Item(itemName,dropChance,price,maxStackSize)
+VALUES ('sword','50','100','1'),('bow','50','100','1'),('shield','50','100','1'),('apple','50','100','1');
+
+INSERT INTO equipable(itemId, weight)
+VALUES('1','10'),('2','5'),('3','20');
